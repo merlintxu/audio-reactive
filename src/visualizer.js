@@ -372,7 +372,57 @@ function initGL(){
 }
 function render(points,edgeTris,polyTris){
   if(!gl) return;
+  // if GL programs failed to initialize, skip rendering
+  if(!progBlit || !progGeo || !progPt) return;
+
   ensureFBO();
+
+  // If ping-pong FBOs are unavailable, fall back to direct rendering (no trails)
+  if(!texA || !texB || !fboA || !fboB){
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.viewport(0,0,W,H);
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE,gl.ONE);
+
+    const uResLocGeo = gl.getUniformLocation(progGeo,"uRes");
+    const uColorLocGeo = gl.getUniformLocation(progGeo,"uColor");
+
+    if(edgeTris && edgeTris.length){
+      gl.useProgram(progGeo);
+      gl.uniform2f(uResLocGeo,W,H);
+      gl.uniform3f(uColorLocGeo,0.68,0.82,1.0);
+      gl.bindVertexArray(vaoGeo);
+      gl.bindBuffer(gl.ARRAY_BUFFER,vboGeo);
+      gl.bufferData(gl.ARRAY_BUFFER,edgeTris,gl.DYNAMIC_DRAW);
+      gl.drawArrays(gl.TRIANGLES,0,(edgeTris.length/3)|0);
+    }
+
+    if(polyTris && polyTris.length){
+      gl.useProgram(progGeo);
+      gl.uniform2f(uResLocGeo,W,H);
+      gl.uniform3f(uColorLocGeo,0.50,0.68,1.0);
+      gl.bindVertexArray(vaoPoly);
+      gl.bindBuffer(gl.ARRAY_BUFFER,vboPoly);
+      gl.bufferData(gl.ARRAY_BUFFER,polyTris,gl.DYNAMIC_DRAW);
+      gl.drawArrays(gl.TRIANGLES,0,(polyTris.length/3)|0);
+    }
+
+    if(points && points.length){
+      gl.useProgram(progPt);
+      gl.uniform2f(gl.getUniformLocation(progPt,"uRes"),W,H);
+      gl.uniform3f(gl.getUniformLocation(progPt,"uColor"),0.92,0.97,1.0);
+      gl.bindVertexArray(vaoPt);
+      gl.bindBuffer(gl.ARRAY_BUFFER,vboPt);
+      gl.bufferData(gl.ARRAY_BUFFER,points,gl.DYNAMIC_DRAW);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,(points.length/4)|0);
+    }
+
+    gl.bindVertexArray(null);
+    return;
+  }
 
   const srcTex=ping?texA:texB;
   const dstFbo=ping?fboB:fboA;
