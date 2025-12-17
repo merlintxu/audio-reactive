@@ -1,0 +1,12 @@
+{
+  "name": "audio-reactive-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "description": "Audio reactive strings + polygons (WebGL trails) with worker + recorder, split UI/renderer (Electron)",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

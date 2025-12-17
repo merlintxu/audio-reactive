@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Controls • Audio Reactive</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;background:#0b0b0b;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+#wrap{padding:14px}
+#row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+button{appearance:none;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;padding:9px 12px;cursor:pointer;font-weight:600}
+button:hover{background:rgba(255,255,255,.12)}
+button:disabled{opacity:.55;cursor:not-allowed}
+.hint{opacity:.75;font-size:12px;line-height:1.2}
+.grid{display:grid;grid-template-columns:1fr 92px;gap:8px 10px;align-items:center}
+label{font-size:12px;opacity:.85}
+input[type="range"]{width:100%}
+input[type="file"], select{width:100%;border-radius:10px;padding:6px 8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;outline:none}
+.val{font-variant-numeric:tabular-nums;text-align:right;font-size:12px;opacity:.9}
+.row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pill{border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:4px 10px;font-size:11px;opacity:.85}
+audio{width:100%;height:32px;opacity:.92}
+kbd{border:1px solid rgba(255,255,255,.18);border-bottom-width:2px;border-radius:8px;padding:2px 6px;background:rgba(255,255,255,.06)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="row">
+    <button id="startBtn">Start / Enable Audio</button>
+    <div class="hint">State: <span id="state">BOOT</span></div>
+  </div>
+
+  <div class="grid">
+    <div><label>Sensibilidad</label><div class="val" id="sensV">1.20</div><input id="sens" type="range" min="0.3" max="4.0" step="0.01" value="1.20"/></div>
+    <div><label>Nodos libres</label><div class="val" id="nodesV">90</div><input id="nodes" type="range" min="0" max="240" step="1" value="90"/></div>
+    <div><label>Persistencia</label><div class="val" id="trailV">0.06</div><input id="trail" type="range" min="0.02" max="0.22" step="0.001" value="0.06"/></div>
+    <div><label>Bits (FFT buckets)</label><div class="val" id="bitsV">56</div><input id="bits" type="range" min="12" max="120" step="1" value="56"/></div>
+    <div><label>Modo bins</label><div class="val" id="modeV">log</div><select id="mode"><option value="log" selected>log</option><option value="linear">linear</option></select></div>
+    <div><label>Follow bins</label><div class="val" id="followV">0.78</div><input id="follow" type="range" min="0" max="1" step="0.01" value="0.78"/></div>
+    <div><label>Explosión (graves)</label><div class="val" id="burstV">0.62</div><input id="burst" type="range" min="0" max="1" step="0.01" value="0.62"/></div>
+    <div><label>Margen seguro</label><div class="val" id="safeV">0.18</div><input id="safe" type="range" min="0.08" max="0.30" step="0.005" value="0.18"/></div>
+    <div><label>Cercanía cuerdas</label><div class="val" id="closeV">0.14</div><input id="close" type="range" min="0.06" max="0.26" step="0.005" value="0.14"/></div>
+    <div><label>Auto-quality</label><div class="val" id="aqV">on</div><select id="aq"><option value="on" selected>on</option><option value="off">off</option></select></div>
+    <div><label>Target FPS</label><div class="val" id="tfV">60</div><input id="tf" type="range" min="30" max="144" step="1" value="60"/></div>
+  </div>
+
+  <div class="row2">
+    <input id="fileInput" type="file" accept="audio/*"/>
+    <button id="filePlay" disabled>▶ Play</button>
+    <button id="useMic">Use Mic</button>
+    <div class="pill" id="srcPill">Source: Mic</div>
+  </div>
+
+  <div class="row2" style="width:100%"><audio id="player" controls preload="metadata"></audio></div>
+
+  <div class="row2">
+    <button id="recBtn" disabled>● Record</button>
+    <div class="hint" id="dl"></div>
+  </div>
+
+  <div class="row2">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;opacity:.85"><input id="fpsToggle" type="checkbox"/> Debug FPS</label>
+    <div class="pill" id="qPill">Q: --</div>
+    <div class="pill" id="glPill">GL: --</div>
+  </div>
+
+  <div class="hint" style="margin-top:10px">Atajos: <kbd>R</kbd> reset (visualizer) · <kbd>F</kbd> fullscreen (visualizer)</div>
+  <div class="hint" id="err" style="margin-top:10px;display:none;color:#ffb4b4"></div>
+</div>
+<script src="./controls.js"></script>
+</body></html>
