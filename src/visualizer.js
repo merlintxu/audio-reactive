@@ -118,10 +118,15 @@ async function resumeAudio(){
 async function enableMic(){
   await resumeAudio();
   if(micSource) return;
-  micStream = await navigator.mediaDevices.getUserMedia({ audio:true });
-  micSource = audioCtx.createMediaStreamSource(micStream);
-  micSource.connect(masterGain);
-  ipcRenderer.send("viz-status",{type:"source", value:"Source: Mic"});
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    micSource = audioCtx.createMediaStreamSource(micStream);
+    micSource.connect(masterGain);
+    ipcRenderer.send("viz-status",{type:"source", value:"Source: Mic"});
+  }catch(e){
+    try{ ipcRenderer.send("viz-status",{type:"error", message:"Mic unavailable or permission denied. Use MP3 or enable mic access."}); }catch(_){ }
+    return;
+  }
 }
 function attachFile(filePath){
   if(fileSource){ try{fileSource.disconnect();}catch(_){} fileSource=null; }
@@ -139,7 +144,7 @@ function attachFile(filePath){
       fileLoaded=true;
       ipcRenderer.send("viz-status",{type:"source", value:"Source: MP3 (paused)"});
     }catch(e){
-      ipcRenderer.send("viz-status",{type:"error", message:"MediaElementSource falló. Reinicia la app si persiste."});
+      ipcRenderer.send("viz-status",{type:"error", message:`MediaElementSource failed: ${e?.message||String(e)}. The audio element will still play but may not be routed into the AudioContext.`});
     }
   });
 }
@@ -199,18 +204,26 @@ function compileShader(type,src){
   const sh=gl.createShader(type);
   gl.shaderSource(sh,src); gl.compileShader(sh);
   if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){
-    const log=gl.getShaderInfoLog(sh); gl.deleteShader(sh); throw new Error(log||"shader compile failed");
+    const log = gl.getShaderInfoLog(sh) || "shader compile failed";
+    try{ ipcRenderer.send("viz-status",{type:"error", message:`Shader compile error: ${log}`}); }catch(_){ }
+    gl.deleteShader(sh);
+    return null;
   }
   return sh;
 }
 function createProgram(vsSrc,fsSrc){
-  const vs=compileShader(gl.VERTEX_SHADER,vsSrc);
-  const fs=compileShader(gl.FRAGMENT_SHADER,fsSrc);
-  const p=gl.createProgram();
+  const vs = compileShader(gl.VERTEX_SHADER, vsSrc);
+  const fs = compileShader(gl.FRAGMENT_SHADER, fsSrc);
+  if(!vs || !fs){ try{ ipcRenderer.send("viz-status",{type:"error", message:"Program creation aborted due to shader compile errors."}); }catch(_){ }
+    return null; }
+  const p = gl.createProgram();
   gl.attachShader(p,vs); gl.attachShader(p,fs); gl.linkProgram(p);
   gl.deleteShader(vs); gl.deleteShader(fs);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS)){
-    const log=gl.getProgramInfoLog(p); gl.deleteProgram(p); throw new Error(log||"program link failed");
+    const log = gl.getProgramInfoLog(p) || "program link failed";
+    try{ ipcRenderer.send("viz-status",{type:"error", message:`Program link error: ${log}`}); }catch(_){ }
+    gl.deleteProgram(p);
+    return null;
   }
   return p;
 }
@@ -228,7 +241,13 @@ function createFBO(tex){
   const f=gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER,f);
   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
-  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error("FBO incomplete");
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if(status !== gl.FRAMEBUFFER_COMPLETE){
+    try{ ipcRenderer.send("viz-status",{type:"error", message:`FBO incomplete (status=${status})`}); }catch(_){ }
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.deleteFramebuffer(f);
+    return null;
+  }
   return f;
 }
 
@@ -285,6 +304,11 @@ function ensureFBO(){
   if(fboA){ gl.deleteFramebuffer(fboA); gl.deleteFramebuffer(fboB); gl.deleteTexture(texA); gl.deleteTexture(texB); }
   texA=createTex(fbW,fbH); texB=createTex(fbW,fbH);
   fboA=createFBO(texA); fboB=createFBO(texB);
+  if(!fboA || !fboB){
+    try{ ipcRenderer.send("viz-status",{type:"error", message:"Failed to create ping-pong FBOs. Trails will be disabled."}); }catch(_){ }
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    return;
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER,fboA); gl.viewport(0,0,fbW,fbH); gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.bindFramebuffer(gl.FRAMEBUFFER,fboB); gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
@@ -294,6 +318,10 @@ function initGL(){
   progBlit=createProgram(quadVS,blitFS);
   progGeo=createProgram(geoVS,geoFS);
   progPt=createProgram(ptVS,ptFS);
+  if(!progBlit || !progGeo || !progPt){
+    try{ ipcRenderer.send("viz-status",{type:"error", message:"GL program initialization failed. Rendering is disabled."}); }catch(_){ }
+    return;
+  }
 
   vaoQuad=gl.createVertexArray();
   vboQuad=gl.createBuffer();
@@ -344,7 +372,57 @@ function initGL(){
 }
 function render(points,edgeTris,polyTris){
   if(!gl) return;
+  // if GL programs failed to initialize, skip rendering
+  if(!progBlit || !progGeo || !progPt) return;
+
   ensureFBO();
+
+  // If ping-pong FBOs are unavailable, fall back to direct rendering (no trails)
+  if(!texA || !texB || !fboA || !fboB){
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.viewport(0,0,W,H);
+    gl.clearColor(0,0,0,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE,gl.ONE);
+
+    const uResLocGeo = gl.getUniformLocation(progGeo,"uRes");
+    const uColorLocGeo = gl.getUniformLocation(progGeo,"uColor");
+
+    if(edgeTris && edgeTris.length){
+      gl.useProgram(progGeo);
+      gl.uniform2f(uResLocGeo,W,H);
+      gl.uniform3f(uColorLocGeo,0.68,0.82,1.0);
+      gl.bindVertexArray(vaoGeo);
+      gl.bindBuffer(gl.ARRAY_BUFFER,vboGeo);
+      gl.bufferData(gl.ARRAY_BUFFER,edgeTris,gl.DYNAMIC_DRAW);
+      gl.drawArrays(gl.TRIANGLES,0,(edgeTris.length/3)|0);
+    }
+
+    if(polyTris && polyTris.length){
+      gl.useProgram(progGeo);
+      gl.uniform2f(uResLocGeo,W,H);
+      gl.uniform3f(uColorLocGeo,0.50,0.68,1.0);
+      gl.bindVertexArray(vaoPoly);
+      gl.bindBuffer(gl.ARRAY_BUFFER,vboPoly);
+      gl.bufferData(gl.ARRAY_BUFFER,polyTris,gl.DYNAMIC_DRAW);
+      gl.drawArrays(gl.TRIANGLES,0,(polyTris.length/3)|0);
+    }
+
+    if(points && points.length){
+      gl.useProgram(progPt);
+      gl.uniform2f(gl.getUniformLocation(progPt,"uRes"),W,H);
+      gl.uniform3f(gl.getUniformLocation(progPt,"uColor"),0.92,0.97,1.0);
+      gl.bindVertexArray(vaoPt);
+      gl.bindBuffer(gl.ARRAY_BUFFER,vboPt);
+      gl.bufferData(gl.ARRAY_BUFFER,points,gl.DYNAMIC_DRAW);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,(points.length/4)|0);
+    }
+
+    gl.bindVertexArray(null);
+    return;
+  }
 
   const srcTex=ping?texA:texB;
   const dstFbo=ping?fboB:fboA;
