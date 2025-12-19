@@ -4,9 +4,47 @@
   "main": "main.js",
   "description": "Audio reactive strings + polygons (WebGL trails) with worker + recorder, split UI/renderer (Electron)",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "ci:check": "node -e \"console.log('ci check')\"",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^31.0.0"
+    "electron": "^31.0.0",
+    "electron-builder": "^24.0.0",
+    "eslint": "^8.50.0"
+  },
+  "build": {
+    "appId": "com.merlintxu.audio-reactive",
+    "productName": "audio-reactive",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "src/**"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build/icons"
+    }
   }
 }
