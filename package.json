@@ -8,5 +8,16 @@
   },
   "devDependencies": {
     "electron": "^31.0.0"
-  }
+    "electron-builder": "^24.0.0",
+    "eslint": "^8.50.0"
 }
+  ,
+  "build": {
+    "appId": "com.merlintxu.audio-reactive",
+    "productName": "audio-reactive",
+    "files": [
+      "main.js",
+      "package.json",
+      "src/**"
+    ]
+  }
