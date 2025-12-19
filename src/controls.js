@@ -54,7 +54,7 @@ ui.fileInput.addEventListener("change",(e)=>{
 ui.filePlay.addEventListener("click",async()=>{
   if(!ui.player.src) return;
   if(ui.player.paused){
-    try{ await ui.player.play(); }catch(_){}
+    try{ await ui.player.play(); }catch{}
     ui.filePlay.textContent="⏸ Pause";
     ipcRenderer.send("audio-cmd",{cmd:"filePlay",playing:true});
   }else{

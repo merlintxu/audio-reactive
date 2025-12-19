@@ -123,13 +123,13 @@ async function enableMic(){
     micSource = audioCtx.createMediaStreamSource(micStream);
     micSource.connect(masterGain);
     ipcRenderer.send("viz-status",{type:"source", value:"Source: Mic"});
-  }catch(e){
-    try{ ipcRenderer.send("viz-status",{type:"error", message:"Mic unavailable or permission denied. Use MP3 or enable mic access."}); }catch(_){ }
+  }catch{
+    try{ ipcRenderer.send("viz-status",{type:"error", message:"Mic unavailable or permission denied. Use MP3 or enable mic access."}); }catch{}
     return;
   }
 }
 function attachFile(filePath){
-  if(fileSource){ try{fileSource.disconnect();}catch(_){} fileSource=null; }
+  if(fileSource){ try{fileSource.disconnect();}catch{} fileSource=null; }
   fileLoaded=false;
   if(!fileAudioEl){
     fileAudioEl=document.createElement("audio");
@@ -152,7 +152,7 @@ async function filePlay(playing){
   await resumeAudio();
   if(!fileLoaded || !fileAudioEl) return;
   if(playing){
-    try{ await fileAudioEl.play(); }catch(_){}
+    try{ await fileAudioEl.play(); }catch{}
     ipcRenderer.send("viz-status",{type:"source", value:"Source: MP3"});
   }else{
     fileAudioEl.pause();
@@ -205,7 +205,7 @@ function compileShader(type,src){
   gl.shaderSource(sh,src); gl.compileShader(sh);
   if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){
     const log = gl.getShaderInfoLog(sh) || "shader compile failed";
-    try{ ipcRenderer.send("viz-status",{type:"error", message:`Shader compile error: ${log}`}); }catch(_){ }
+    try{ ipcRenderer.send("viz-status",{type:"error", message:`Shader compile error: ${log}`}); }catch{}
     gl.deleteShader(sh);
     return null;
   }
@@ -214,14 +214,14 @@ function compileShader(type,src){
 function createProgram(vsSrc,fsSrc){
   const vs = compileShader(gl.VERTEX_SHADER, vsSrc);
   const fs = compileShader(gl.FRAGMENT_SHADER, fsSrc);
-  if(!vs || !fs){ try{ ipcRenderer.send("viz-status",{type:"error", message:"Program creation aborted due to shader compile errors."}); }catch(_){ }
+  if(!vs || !fs){ try{ ipcRenderer.send("viz-status",{type:"error", message:"Program creation aborted due to shader compile errors."}); }catch{}
     return null; }
   const p = gl.createProgram();
   gl.attachShader(p,vs); gl.attachShader(p,fs); gl.linkProgram(p);
   gl.deleteShader(vs); gl.deleteShader(fs);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS)){
     const log = gl.getProgramInfoLog(p) || "program link failed";
-    try{ ipcRenderer.send("viz-status",{type:"error", message:`Program link error: ${log}`}); }catch(_){ }
+    try{ ipcRenderer.send("viz-status",{type:"error", message:`Program link error: ${log}`}); }catch{}
     gl.deleteProgram(p);
     return null;
   }
@@ -243,7 +243,7 @@ function createFBO(tex){
   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
   const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   if(status !== gl.FRAMEBUFFER_COMPLETE){
-    try{ ipcRenderer.send("viz-status",{type:"error", message:`FBO incomplete (status=${status})`}); }catch(_){ }
+    try{ ipcRenderer.send("viz-status",{type:"error", message:`FBO incomplete (status=${status})`}); }catch{}
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     gl.deleteFramebuffer(f);
     return null;
@@ -305,7 +305,7 @@ function ensureFBO(){
   texA=createTex(fbW,fbH); texB=createTex(fbW,fbH);
   fboA=createFBO(texA); fboB=createFBO(texB);
   if(!fboA || !fboB){
-    try{ ipcRenderer.send("viz-status",{type:"error", message:"Failed to create ping-pong FBOs. Trails will be disabled."}); }catch(_){ }
+    try{ ipcRenderer.send("viz-status",{type:"error", message:"Failed to create ping-pong FBOs. Trails will be disabled."}); }catch{}
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     return;
   }
@@ -319,7 +319,7 @@ function initGL(){
   progGeo=createProgram(geoVS,geoFS);
   progPt=createProgram(ptVS,ptFS);
   if(!progBlit || !progGeo || !progPt){
-    try{ ipcRenderer.send("viz-status",{type:"error", message:"GL program initialization failed. Rendering is disabled."}); }catch(_){ }
+    try{ ipcRenderer.send("viz-status",{type:"error", message:"GL program initialization failed. Rendering is disabled."}); }catch{}
     return;
   }
 
@@ -591,7 +591,7 @@ async function startRecording(){
   recording=true;
 }
 function stopRecording(){
-  if(mediaRecorder && recording){ recording=false; try{mediaRecorder.stop();}catch(_){} }
+  if(mediaRecorder && recording){ recording=false; try{mediaRecorder.stop();}catch{} }
 }
 
 /* ===== IPC ===== */
